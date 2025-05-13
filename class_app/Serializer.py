@@ -1,8 +1,7 @@
 from rest_framework import serializers
-from accounts_app.models import User
 from .models import ClassRooms, Students
 from rest_framework.exceptions import ValidationError
-from accounts_app.Serializer import UserSerializerList
+from accounts_app.Serializers import UserListSerializer
 
 
 class ClassRoomCreatedSerializer(serializers.ModelSerializer):
@@ -20,8 +19,8 @@ class ClassRoomCreatedSerializer(serializers.ModelSerializer):
 
 
 class ClassRoomEditSerializer(serializers.ModelSerializer):
-    mentor = UserSerializerList(many=True, required=False)
-    teacher = UserSerializerList(many=True, required=False)
+    mentor = UserListSerializer(many=True, required=False)
+    teacher = UserListSerializer(many=True, required=False)
 
     class Meta:
         model = ClassRooms
@@ -30,7 +29,7 @@ class ClassRoomEditSerializer(serializers.ModelSerializer):
 
 
 class ClassRoomListSerializer(serializers.ModelSerializer):
-    teacher = UserSerializerList(many=True, required=False)
+    teacher = UserListSerializer(many=True, required=False)
 
     class Meta:
         model = ClassRooms
@@ -40,6 +39,7 @@ class ClassRoomListSerializer(serializers.ModelSerializer):
 
 class PasswordSerializer(serializers.Serializer):
     password = serializers.CharField(max_length=255)
+
 
 class StudentSerializer(serializers.ModelSerializer):
     class Meta:

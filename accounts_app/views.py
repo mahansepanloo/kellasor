@@ -1,44 +1,51 @@
-from .models import User
 from rest_framework.viewsets import ModelViewSet
-from .Serializer import *
+from .Serializers import *
 from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
 from rest_framework.generics import RetrieveUpdateAPIView
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.core.cache import cache
-from .validate import generate_code
+from .utils import generate_code
 
 
 class UserViewSet(ModelViewSet):
+    """
+    Post :
+        for create new user and get username and password for create user
+    retrieve:
+        if user is admin see all user for id_user but is not see self
+    list :
+        if user is admin see all user
+    put or delete :
+        if user is admin put or delete all user but is not admin see self
+    """
+
     queryset = User.objects.all()
-    serializer_class = UserSerializerRegister
+    serializer_class = UserCreateSerializer
 
     def get_permissions(self):
         if self.request.method == "POST":
             return [AllowAny()]
+        elif self.action == "list":
+            return [IsAdminUser()]
         else:
-            if self.request.user.is_authenticated:
-                return [IsAdminUser()]
             return [IsAuthenticated()]
 
     def get_serializer_class(self):
         if self.action == "list":
-            return UserSerializerList
+            return UserListSerializer
         elif self.action == "retrieve":
-            return UserSerializerRetrieve
+            return UserRetrieveSerializer
+        elif self.action in ["update", "partial_update"]:
+            if self.request.user.is_staff:
+                return AdminUserUpdateSerializer
+            return UserUpdateSerializer
         return super().get_serializer_class()
 
-
-class EditUserView(RetrieveUpdateAPIView):
-    queryset = User.objects.all()
-    serializer_class = UserEditProfileSerializer
-    permission_classes = [IsAuthenticated]
-
     def get_queryset(self):
-        if self.request.user.is_superuser:
+        if self.request.user.is_staff:
             return User.objects.all()
-        else:
-            return User.objects.filter(id=self.request.user.id)
+        return User.objects.filter(id=self.request.user.id)
 
 
 class ResetPasswordView(RetrieveUpdateAPIView):
@@ -85,7 +92,7 @@ class VerifyCodeView(APIView):
 
         user = User.objects.filter(username=cached_data["username"]).first()
         password = serializer.validated_data["password"]
-        password_format(password, serializer.validated_data["password2"])
+        password_validate(password, serializer.validated_data["password2"])
         user.set_password(password)
         user.save()
 

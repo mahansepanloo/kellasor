@@ -1,24 +1,13 @@
 from rest_framework import serializers
 from .models import User
-from .validate import password_format
+from .utils import password_validate
 import re
 
 
-class UserSerializerList(serializers.ModelSerializer):
-    class Meta:
-        model = User
-        fields = ["username", "first_name", "last_name", "id"]
-        read_only_fields = ("id", "date_joined", "last_login")
+READONLYFIELDS = ("id", "date_joined", "last_login")
 
 
-class UserSerializerRetrieve(serializers.ModelSerializer):
-    class Meta:
-        model = User
-        exclude = ["password"]
-        read_only_fields = ("id", "date_joined", "last_login")
-
-
-class UserSerializerRegister(serializers.ModelSerializer):
+class UserCreateSerializer(serializers.ModelSerializer):
     password2 = serializers.CharField(write_only=True)
 
     class Meta:
@@ -27,39 +16,60 @@ class UserSerializerRegister(serializers.ModelSerializer):
         extra_kwargs = {
             "password": {"write_only": True},
         }
-        read_only_fields = ("id", "date_joined", "last_login")
 
     def validate_username(self, value):
-        user = User.objects.filter(username=value)
-        if value == "admin":
-            raise serializers.ValidationError("Username already exists")
-        elif value == "mahan":
-            raise serializers.ValidationError("Username can't be admin")
-        elif len(value) <= 2:
+        user = User.objects.filter(username=value).exists()
+        if len(value.strip()) <= 2:
             raise serializers.ValidationError(
                 "Username must be at least 2 characters long"
             )
+        elif user:
+            raise serializers.ValidationError("Username already exists")
         return value
 
     def validate(self, data):
-        passwords = data["password"]
-        passwords2 = data["password2"]
-        password_format(passwords, passwords2)
+        passwords = data.get("password", None)
+        passwords2 = data.get("password2", None)
+        password_validate(passwords, passwords2)
         return data
 
     def create(self, validated_data):
-        User.objects.create_user(
+        validated_data.pop("password2")
+        user = User.objects.create_user(
             username=validated_data["username"],
             password=validated_data["password"],
         )
-        return validated_data
+        return user
 
 
-class UserEditProfileSerializer(serializers.ModelSerializer):
+class UserListSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = "__all__"
-        exclude = ["password", "username"]
+        fields = [
+            "username",
+            "first_name",
+            "last_name",
+        ]
+
+
+class UserRetrieveSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        exclude = ["password"]
+        read_only_fields = READONLYFIELDS
+
+
+class AdminUserUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = READONLYFIELDS + ("username", "first_name", "last_name", "is_active")
+        read_only_fields = READONLYFIELDS
+
+
+class UserUpdateSerializer(AdminUserUpdateSerializer):
+    class Meta(AdminUserUpdateSerializer.Meta):
+        model = User
+        fields = ["username", "first_name", "last_name"]
 
 
 class ResetPasswordSerializer(serializers.ModelSerializer):
@@ -77,7 +87,7 @@ class ResetPasswordSerializer(serializers.ModelSerializer):
         old = data["old_password"]
         user = self.context["request"].user
         if user.check_password(old):
-            password_format(passwords, passwords2)
+            password_validate(passwords, passwords2)
             return data
         else:
             return serializers.ValidationError("Old password is incorrect")
@@ -106,5 +116,5 @@ class VerifyCodeSerializer(serializers.Serializer):
     def validate(self, data):
         passwords = data["password"]
         passwords2 = data["password2"]
-        password_format(passwords, passwords2)
+        password_validate(passwords, passwords2)
         return data

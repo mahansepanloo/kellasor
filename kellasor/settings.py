@@ -1,3 +1,4 @@
+from datetime import timedelta
 from pathlib import Path
 import os
 
@@ -127,6 +128,9 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 #restframework
 REST_FRAMEWORK = {
+    "DEFAULT_AUTHENTICATION_CLASSES": (
+        "rest_framework_simplejwt.authentication.JWTAuthentication",
+    ),
 
     'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
     'PAGE_SIZE': 20
@@ -153,3 +157,9 @@ CELERY_TIMEZONE = TIME_ZONE
 CELERY_TASK_SERIALIZER = "json"
 CELERY_TASK_IGNORE_RESULT = True
 CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "")
+
+
+SIMPLE_JWT = {
+    'ACCESS_TOKEN_LIFETIME': timedelta(hours=12),  # مدت زمان اعتبار توکن access
+    'REFRESH_TOKEN_LIFETIME': timedelta(days=30),    # مدت زمان اعتبار توکن refresh
+}
