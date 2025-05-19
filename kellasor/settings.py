@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     
     #apps
     "accounts_app.apps.AccountsAppConfig",
+    "class_app.apps.ClassAppConfig",
 
 ]
 
