@@ -28,6 +28,8 @@ class ClassRooms(BaseModel):
         return self.name
 
     def save(self, *args, **kwargs):
+        if self.teacher.count() < 1:
+            raise ValueError("Teacher can only be one")
         if not self.password:  
             if self.class_type == "private" and self.access_type == "password":
                 self.password = generator_password(5)

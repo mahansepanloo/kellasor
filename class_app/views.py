@@ -1,15 +1,18 @@
 from django.shortcuts import render
 from .models import ClassRooms, Students
 from accounts_app.models import User
-from rest_framework.viewsets import ModelViewSet
+from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 from .Serializer import *
 from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
-from rest_framework.generics import RetrieveUpdateAPIView
+from rest_framework.generics import RetrieveUpdateAPIView, RetrieveAPIView
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.core.cache import cache
 from rest_framework.generics import *
 from rest_framework import status
+from django_filters.rest_framework import DjangoFilterBackend
+from rest_framework.filters import SearchFilter, OrderingFilter
+from utls.permission import IsTeacher
 
 
 class ClassRoomViewSet(ModelViewSet):
@@ -101,3 +104,29 @@ class JoinView(APIView):
             {"error": "You are not allowed to join this class"},
             status=status.HTTP_403_FORBIDDEN,
         )
+
+
+class StudentView(GenericAPIView):
+    permission_classes = [IsAuthenticated, IsTeacher]
+    queryset = ClassRooms.objects.all()
+    lookup_field = "pk"
+    serializer_class = StudentSerializer
+
+    def get(self, request, *args, **kwargs):
+        class_room = self.get_object()
+        students = class_room.students.all()
+        serializer = self.get_serializer(students, many=True)
+        return Response(serializer.data)
+
+    def delete(self, request, *args, **kwargs):
+        class_room = self.get_object()
+        student_id = request.data.get("student_id")
+        if not student_id:
+            return Response({"error": "student_id is required"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        try:
+            student = Students.objects.get(class_room=class_room, student=student_id)
+            student.delete()
+            return Response({"message": "Student removed from class"}, status=status.HTTP_200_OK)
+        except Students.DoesNotExist:
+            return Response({"error": "Student not found"}, status=status.HTTP_404_NOT_FOUND)
