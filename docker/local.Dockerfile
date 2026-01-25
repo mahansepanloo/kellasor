@@ -1,4 +1,4 @@
-FROM docker.arvancloud.ir/python:3.12-slim AS builder
+FROM python:3.12-slim AS builder
 
 COPY --from=ghcr.io/astral-sh/uv:0.9.8 /uv /uvx /bin/
 
@@ -17,7 +17,7 @@ RUN uv sync --no-install-project --frozen -n
 
 RUN mkdir -p /app/logs/
 
-FROM docker.arvancloud.ir/python:3.12-slim AS app
+FROM python:3.12-slim AS app
 
 ENV PYTHONUNBUFFERED=1
 ENV PYTHONDONTWRITEBYTECODE=1
