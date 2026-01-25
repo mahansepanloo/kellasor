@@ -1,0 +1,65 @@
+services:
+  pgadmin:
+    image: dpage/pgadmin4
+    environment:
+      PGADMIN_DEFAULT_EMAIL: mahan@mail.com
+      PGADMIN_DEFAULT_PASSWORD: password
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    volumes:
+      - pgadmin:/var/lib/pgadmin
+      - ${HOME}/db_backup:/db_backup
+    ports:
+      - "5060:80"
+    networks:
+      - kellasor_network
+    depends_on:
+      - db
+    restart: unless-stopped
+  db:
+    image: postgres:16.1
+    environment:
+      - POSTGRES_DB=kellasor_local
+      - POSTGRES_USER=kellasor
+      - POSTGRES_PASSWORD=password
+    networks:
+      - kellasor_network
+    ports:
+      - '5434:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+  redis:
+    image: redis:latest
+    networks:
+      - kellasor_network
+    volumes:
+      - redis_data:/data
+    ports:
+      - '6381:6379'
+  rabbitmq:
+    image: rabbitmq:3-management
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: "guest"
+      RABBITMQ_DEFAULT_PASS: "guest"
+      RABBITMQ_ERLANG_COOKIE: "MY_SECRET_COOKIE"
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: [ "CMD", "rabbitmqctl", "status" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - kellasor_network
+
+networks:
+  kellasor_network:
+
+volumes:
+  redis_data:
+  postgres_data:
+  pgadmin:
+  rabbitmq-data:
