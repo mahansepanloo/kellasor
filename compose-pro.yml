@@ -1,0 +1,143 @@
+x-django-app:
+  &main-app-image
+  build:
+    context: .
+    dockerfile: docker/local.Dockerfile
+    target: app
+  restart: unless-stopped
+  env_file:
+    - .env
+  environment:
+    - DJANGO_SETTINGS_MODULE=Kellasor.settings
+    - POSTGRES_NAME=kellasor_local
+    - POSTGRES_USERNAME=kellasor
+    - POSTGRES_HOST=db
+    - POSTGRES_PORT=5432
+    - POSTGRES_PASSWORD=password
+    - REDIS_CACHE=redis://redis:6379/1
+  networks:
+    - kellasor_network
+  depends_on:
+    rabbitmq:
+      condition: service_healthy
+    db:
+      condition: service_started
+    redis:
+      condition: service_started
+
+
+services:
+  lenny:
+    <<: *main-app-image
+    ports:
+      - '8000:8000'
+    command: bash -c "python -m docker.db_is_ready && python manage.py runserver 0.0.0.0:8000"
+  celery:
+    <<: *main-app-image
+    command: bash -c "celery -A Kellasor worker -l INFO -E -P threads --concurrency 20"
+  celery_beat:
+    <<: *main-app-image
+    command: bash -c "celery -A Kellasor beat -l INFO --scheduler django_celery_beat.schedulers:DatabaseScheduler"
+  pgadmin:
+    image: dpage/pgadmin4
+    environment:
+      PGADMIN_DEFAULT_EMAIL: mahan@mail.com
+      PGADMIN_DEFAULT_PASSWORD: password
+      PGADMIN_CONFIG_SERVER_MODE: 'False'
+    volumes:
+      - pgadmin:/var/lib/pgadmin
+      - ${HOME}/db_backup:/db_backup
+    ports:
+      - "5051:80"
+    networks:
+      - kellasor_network
+    depends_on:
+      - db
+    restart: unless-stopped
+  db:
+    image: postgres:16.1
+    environment:
+      - POSTGRES_DB=kellasor_local
+      - POSTGRES_USER=kellasor
+      - POSTGRES_PASSWORD=password
+    networks:
+      - kellasor_network
+    ports:
+      - '5434:5432'
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+  redis:
+    image: redis:latest
+    networks:
+      - kellasor_network
+    volumes:
+      - redis_data:/data
+    ports:
+      - '6381:6379'
+  elasticsearch:
+    image: elasticsearch:8.15.0
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=false
+      - xpack.security.http.ssl.enabled=false
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+    ports:
+      - "9200:9200"
+    volumes:
+      - elastic_data:/usr/share/elasticsearch/data
+    networks:
+      - kellasor_network
+  kibana:
+    image: kibana:8.15.0
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - XPACK_SECURITY_ENABLED=false
+      - XPACK_MONITORING_ENABLED=false
+    ports:
+      - "5601:5601"
+    depends_on:
+      - elasticsearch
+    networks:
+      - kellasor_network
+  rabbitmq:
+    image: rabbitmq:3-management
+    restart: unless-stopped
+    environment:
+      RABBITMQ_DEFAULT_USER: "guest"
+      RABBITMQ_DEFAULT_PASS: "guest"
+      RABBITMQ_ERLANG_COOKIE: "MY_SECRET_COOKIE"
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: [ "CMD", "rabbitmqctl", "status" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    networks:
+      - kellasor_network
+  flower:
+    image: mher/flower:master
+    volumes:
+      - flower_data:/data
+    ports:
+      - "5555:5555"
+    networks:
+      - kellasor_network
+    command: celery --broker=amqp://guest:guest@rabbitmq:5672/ flower
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+networks:
+  kellasor_network:
+
+volumes:
+  redis_data:
+  postgres_data:
+  pgadmin:
+  elastic_data:
+  rabbitmq-data:
+  flower_data:
