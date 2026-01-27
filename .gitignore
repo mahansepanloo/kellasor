@@ -6,9 +6,6 @@ __pycache__
 env/
 *.sqlite3
 .idea/
-test*.py
-test*.xml
-test*.json
 pk.xml
 key.pem
 media/*
