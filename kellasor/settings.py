@@ -1,7 +1,9 @@
 from datetime import timedelta
 from pathlib import Path
 import os
+from dotenv import load_dotenv
 
+load_dotenv()
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -10,7 +12,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY =  os.environ.get("SECRET_KEY", "bV7kmTus5NcrzCJM85nkU1YBCn")
+SECRET_KEY = os.environ.get("SECRET_KEY", "bV7kmTus5NcrzCJM85nkU1YBCn")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -27,15 +29,12 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    'rest_framework',
+    "rest_framework",
     "rest_framework_simplejwt",
     "django_filters",
-
-    
-    #apps
+    # apps
     "accounts_app.apps.AccountsAppConfig",
     "class_app.apps.ClassAppConfig",
-
 ]
 
 MIDDLEWARE = [
@@ -126,18 +125,16 @@ STATIC_URL = "static/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-#restframework
+# restframework
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
-
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 20
-
+    "DEFAULT_PAGINATION_CLASS": "rest_framework.pagination.PageNumberPagination",
+    "PAGE_SIZE": 20,
 }
 
- #redis
+# redis
 
 CACHES = {
     "default": {
@@ -145,11 +142,11 @@ CACHES = {
         "LOCATION": "redis://127.0.0.1:6381/1",
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
-        }
+        },
     }
 }
 
-AUTH_USER_MODEL = 'accounts_app.User'
+AUTH_USER_MODEL = "accounts_app.User"
 
 
 CELERY_ACCEPT_CONTENT = ["application/json"]
@@ -160,6 +157,6 @@ CELERY_BROKER_URL = os.environ.get("CELERY_BROKER_URL", "")
 
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(hours=12),  # مدت زمان اعتبار توکن access
-    'REFRESH_TOKEN_LIFETIME': timedelta(days=30),    # مدت زمان اعتبار توکن refresh
+    "ACCESS_TOKEN_LIFETIME": timedelta(hours=12),  # مدت زمان اعتبار توکن access
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=30),  # مدت زمان اعتبار توکن refresh
 }

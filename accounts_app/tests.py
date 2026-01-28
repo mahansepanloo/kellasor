@@ -1,4 +1,4 @@
-from django.contrib.auth.models import User
+from accounts_app.models import User
 from rest_framework.test import APITestCase
 from rest_framework import status
 
@@ -18,15 +18,15 @@ class BaseUserTestCase(APITestCase):
 
 class UserViewSetTest(BaseUserTestCase):
     def test_register_user_with_duplicate_username_should_fail(self):
-        url = "/users/"
+        url = "/user/users/"
 
         data = {
-            "username": "user1",
+            "username": "admin10",
             "password": "StrongPass123",
             "password2": "StrongPass123",
         }
 
         response = self.client.post(url, data)
-
+        print(response.content)
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertIn("username", response.data)
