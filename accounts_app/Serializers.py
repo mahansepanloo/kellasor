@@ -1,8 +1,8 @@
+from django.core.cache import cache
 from rest_framework import serializers
 from .models import User
 from .utils import password_validate
-import re
-
+from utls.response import ResponseMessage
 
 READONLYFIELDS = ("id", "date_joined", "last_login")
 
@@ -21,10 +21,12 @@ class UserCreateSerializer(serializers.ModelSerializer):
         user = User.objects.filter(username=value).exists()
         if len(value.strip()) <= 2:
             raise serializers.ValidationError(
-                "Username must be at least 2 characters long"
+                ResponseMessage.error("Username must be at least 2 characters long")
             )
         elif user:
-            raise serializers.ValidationError("Username already exists")
+            raise serializers.ValidationError(
+                ResponseMessage.error("Username already exists")
+            )
         return value
 
     def validate(self, data):
@@ -72,49 +74,66 @@ class UserUpdateSerializer(AdminUserUpdateSerializer):
         fields = ["username", "first_name", "last_name"]
 
 
-class ResetPasswordSerializer(serializers.ModelSerializer):
+class ChangePasswordSerializer(serializers.ModelSerializer):
     password2 = serializers.CharField(write_only=True)
     old_password = serializers.CharField(write_only=True)
+    password = serializers.CharField(write_only=True)
 
     class Meta:
         model = User
-        fields = "__all__"
-        exclude = ["password"]
+        fields = ["password", "password2", "old_password"]
 
     def validate(self, data):
-        passwords = data["password"]
-        passwords2 = data["password2"]
-        old = data["old_password"]
+        passwords = data.get("password")
+        passwords2 = data.get("password2")
+        old_password = data.get("old_password")
         user = self.context["request"].user
-        if user.check_password(old):
+        if user.check_password(old_password):
             password_validate(passwords, passwords2)
             return data
         else:
-            return serializers.ValidationError("Old password is incorrect")
+            raise serializers.ValidationError(
+                ResponseMessage.error("Old password is incorrect")
+            )
+
+    def update(self, instance, validated_data):
+        instance.set_password(validated_data["password"])
+        instance.save(update_fields=["password"])
+        return instance
 
 
 class ForgetPasswordSerializer(serializers.Serializer):
     username = serializers.CharField()
-    phone = serializers.CharField()
 
-    def validate_phone(self, value):
-        patterns = [
-            re.compile(r"^\+98\d{10}$"),
-            re.compile(r"^09\d{9}$"),
-        ]
-        if not any(p.match(value) for p in patterns):
-            raise serializers.ValidationError("Phone number is not valid")
-        return value
+    def validate(self, data):
+        self.instance = User.objects.filter(username=data["username"]).first()
+        return data
 
 
 class VerifyCodeSerializer(serializers.Serializer):
-    phone = serializers.CharField()
+    phone_number = serializers.CharField()
     code = serializers.CharField()
     password = serializers.CharField()
     password2 = serializers.CharField()
 
     def validate(self, data):
-        passwords = data["password"]
-        passwords2 = data["password2"]
-        password_validate(passwords, passwords2)
+        cached_data = cache.get(data["phone_number"])
+        if not cached_data:
+            raise serializers.ValidationError({"error": "code not correct"})
+
+        if str(cached_data["code"]) != data["code"]:
+            raise serializers.ValidationError({"error": "code not correct"})
+
+        password_validate(data["password"], data["password2"])
+
+        self.instance = User.objects.filter(username=cached_data["username"]).first()
+
+        if not self.instance:
+            raise serializers.ValidationError({"error": "user not found"})
+
         return data
+
+    def change_password(self):
+        self.instance.set_password(self.validated_data["password"])
+        self.instance.save(update_fields=["password"])
+        cache.delete(self.validated_data["phone_number"])

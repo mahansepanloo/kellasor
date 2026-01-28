@@ -1,11 +1,12 @@
 from rest_framework.viewsets import ModelViewSet
-from .Serializers import *
+from accounts_app.Serializers import *
 from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
-from rest_framework.generics import RetrieveUpdateAPIView
+from rest_framework.generics import UpdateAPIView
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from django.core.cache import cache
-from .utils import generate_code
+from accounts_app.utils import generate_code
+from rest_framework import status
 
 
 class UserViewSet(ModelViewSet):
@@ -48,54 +49,56 @@ class UserViewSet(ModelViewSet):
         return User.objects.filter(id=self.request.user.id)
 
 
-class ResetPasswordView(RetrieveUpdateAPIView):
+class ChangePasswordViewSet(UpdateAPIView):
+    """
+    user can change self password
+    """
+
     queryset = User.objects.all()
-    serializer_class = ResetPasswordSerializer
+    serializer_class = ChangePasswordSerializer
     permission_classes = [IsAuthenticated]
 
-    def get_queryset(self):
-        if self.request.user.is_superuser:
-            return User.objects.all()
-        else:
-            return User.objects.filter(id=self.request.user.id)
+    def get_object(self):
+        user = self.request.user
+        return user
+
+    def update(self, request, *args, **kwargs):
+        serializer = self.get_serializer(self.get_object(), data=request.data)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        return Response({"result": "ok"}, status=status.HTTP_200_OK)
 
 
 class ForgetPasswordView(APIView):
+    """
+    send otp code for valid user
+    """
+
     def post(self, request):
         serializer = ForgetPasswordSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        if User.objects.filter(
-            username=serializer.validated_data["username"],
-            phone=serializer.validated_data["phone"],
-        ).exists():
+        user = serializer.instance
+        if user:
+            # sendsms()
             cache.set(
-                serializer.validated_data["phone"],
+                serializer.validated_data["username"],
                 {
                     "username": serializer.validated_data["username"],
                     "code": generate_code(),
                 },
                 timeout=180,
             )
-        return Response({"message": "send code for reset password"})
+        return Response({"detail": "send code for reset password"})
 
 
 class VerifyCodeView(APIView):
+    """
+    change password by otp code
+    """
+
     def post(self, request):
         serializer = VerifyCodeSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-
-        cached_data = cache.get(serializer.validated_data["phone"])
-        if not cached_data:
-            return Response({"message": "not found code"})
-        if cached_data["code"] != serializer.validated_data["code"]:
-            return Response({"message": "code not correct "})
-
-        user = User.objects.filter(username=cached_data["username"]).first()
-        password = serializer.validated_data["password"]
-        password_validate(password, serializer.validated_data["password2"])
-        user.set_password(password)
-        user.save()
-
-        cache.delete(serializer.validated_data["phone"])
-
-        return Response({"message": "change password successful"})
+        serializer.change_password()
+        return Response({"result": "ok"})
